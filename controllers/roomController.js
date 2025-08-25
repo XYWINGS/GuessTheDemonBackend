@@ -1,6 +1,6 @@
-const Room = require("../models/Room");
-const Player = require("../models/Player");
+// const Player = require("../models/Player");
 
+const Room = require("../models/Room");
 // Create a new room
 exports.createRoom = async (req, res) => {
   try {
