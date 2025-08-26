@@ -6,7 +6,8 @@ const roomSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true },
   host: { type: String, required: true },
   players: [playerSchema],
-  phase: { type: String, enum: ["day", "night"], default: "day" },
+  numOfPlayers: { type: Number, default: playerSchema.paths.length },
+  phase: { type: String, enum: ["day", "demons", "doctor", "inspector", "lobby"], default: "lobby" },
 });
 
 module.exports = mongoose.model("Room", roomSchema);

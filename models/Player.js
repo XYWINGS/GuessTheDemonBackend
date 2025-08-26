@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+
 const playerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   isHost: { type: Boolean, default: false },
@@ -8,9 +9,8 @@ const playerSchema = new mongoose.Schema({
     default: "villager",
   },
   alive: { type: Boolean, default: true },
-  killedBy: { type: String, enum: ["demon", "vampire", "villagers"], default: null },
+  killedBy: { type: String, enum: ["demons", "vampire", "villagers"], default: null },
   votes: { type: Number, default: 0 },
-  roomId: { type: mongoose.Schema.Types.ObjectId, ref: "Room", required: true },
 });
 
 module.exports = mongoose.model("Player", playerSchema);
