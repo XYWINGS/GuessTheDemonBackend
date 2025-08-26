@@ -37,7 +37,7 @@ exports.joinRoom = async (req, res) => {
 
     // Check if player already exists in the room
     const existingPlayer = room.players.find((p) => p.name === name);
-    if (existingPlayer) return res.status(400).json({ error: "Player already joined" });
+    if (existingPlayer) return res.status(200).json({ error: "Player already joined" });
 
     // Add new player
     const newPlayer = {
