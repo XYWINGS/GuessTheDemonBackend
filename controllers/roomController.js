@@ -4,10 +4,25 @@ const Room = require("../models/Room");
 // Create a new room
 exports.createRoom = async (req, res) => {
   try {
+    const { hostname } = req.body;
+    console.log("Hostname:", hostname);
+
     const code = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const room = new Room({ code });
+
+    const room = new Room({
+      code,
+      host: hostname,
+      players: [
+        {
+          name: hostname,
+          isHost: true,
+          alive: true,
+        },
+      ],
+    });
+
     await room.save();
-    res.json(room);
+    res.status(201).json(room);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

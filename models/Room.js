@@ -1,11 +1,21 @@
 const mongoose = require("mongoose");
 
+const playerSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  isHost: { type: Boolean, default: false },
+  role: {
+    type: String,
+    enum: ["villager", "demon", "demonLeader", "inspector", "doctor", "vampire"],
+    default: "villager",
+  },
+  alive: { type: Boolean, default: true },
+});
+
 const roomSchema = new mongoose.Schema({
-  code: { type: String, unique: true, required: true }, // room code
-  players: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player" }],
-  phase: { type: String, enum: ["lobby", "day", "night", "ended"], default: "lobby" },
-  votes: { type: Map, of: String, default: {} }, // playerId → targetId
-  nightActions: { type: Map, of: String, default: {} }, // role-specific actions
+  code: { type: String, required: true, unique: true },
+  host: { type: String, required: true },
+  players: [playerSchema],
+  phase: { type: String, enum: ["day", "night"], default: "day" },
 });
 
 module.exports = mongoose.model("Room", roomSchema);
