@@ -169,7 +169,7 @@ io.on("connection", (socket) => {
       id: socket.id,
       name: playerName,
       role: null,
-      isAlive: false,
+      isAlive: true,
       isHost: true,
     });
 
@@ -183,11 +183,13 @@ io.on("connection", (socket) => {
     });
 
     console.log(`Session created: ${sessionId} by ${playerName}`);
+    console.log(`Session Players: ${gameSession.players.map((p) => p.name).join(", ")}`);
   });
 
   // Handle joining an existing game session
   socket.on("join-session", (data) => {
     const { sessionId, playerName } = data;
+    console.log(`Player ${playerName} attempting to join session: ${sessionId}`);
     const gameSession = gameSessions.get(sessionId);
 
     if (!gameSession) {
@@ -210,7 +212,7 @@ io.on("connection", (socket) => {
       id: socket.id,
       name: playerName,
       role: null,
-      isAlive: false,
+      isAlive: true,
       isHost: false,
     });
 
@@ -224,7 +226,6 @@ io.on("connection", (socket) => {
 
     // Notify all players in the session
     io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
-
     console.log(`Player ${playerName} joined session: ${sessionId}`);
   });
 
