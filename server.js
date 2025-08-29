@@ -35,6 +35,9 @@ class GameSession {
     this.hostId = hostId;
   }
 
+  clearVotes() {
+    this.votes = {};
+  }
   assignRoles() {
     const playerCount = this.players.length;
     let roles = [];
@@ -123,7 +126,7 @@ class GameSession {
       players: this.players.map((player) => ({
         id: player.id,
         name: player.name,
-        role: this.gameState === "playing" ? player.role : null,
+        role: null,
         isAlive: player.isAlive,
         isHost: player.id === this.hostId,
       })),
@@ -143,8 +146,8 @@ setInterval(() => {
   const inactiveSessions = [];
 
   gameSessions.forEach((session, sessionId) => {
-    // Remove sessions inactive for more than 2 hours
-    if (now - session.createdAt > 2 * 60 * 60 * 1000) {
+    // Remove sessions inactive for more than 1 hours
+    if (now - session.createdAt > 60 * 60 * 1000) {
       inactiveSessions.push(sessionId);
     }
   });
@@ -181,6 +184,8 @@ io.on("connection", (socket) => {
       sessionId,
       player: gameSession.players.find((p) => p.id === socket.id),
     });
+
+    io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
 
     console.log(`Session created: ${sessionId} by ${playerName}`);
     console.log(`Session Players: ${gameSession.players.map((p) => p.name).join(", ")}`);
@@ -238,10 +243,10 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (gameSession.players.length < 5) {
-      socket.emit("error", { message: "Need at least 5 players to start" });
-      return;
-    }
+    // if (gameSession.players.length < 5) {
+    //   socket.emit("error", { message: "Need at least 5 players to start" });
+    //   return;
+    // }
 
     gameSession.gameState = "playing";
     gameSession.assignRoles();
@@ -273,7 +278,10 @@ io.on("connection", (socket) => {
 
   // Handle voting
   socket.on("vote", (data) => {
-    const { sessionId, voterId, targetId } = data;
+    const { voterName, sessionId, voterId, targetId, targetName } = data;
+    console.log(`Vote in session ${sessionId} from ${voterName} to ${targetName}`);
+    console.log(`Vote in session data ${data}`);
+
     const gameSession = gameSessions.get(sessionId);
 
     if (!gameSession) return;
