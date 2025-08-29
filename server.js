@@ -50,24 +50,27 @@ class GameSession {
 
     // Determine roles based on player count
     if (playerCount >= 5 && playerCount <= 7) {
-      roles = ["villager", "villager", "villager", "demons", "inspector", "doctor"];
+      roles = ["villager", "villager", "villager", "demon", "inspector", "doctor"];
     } else if (playerCount == 2) {
-      roles = ["villager", "demons"];
+      roles = ["villager", "demon"];
     } else if (playerCount >= 8) {
-      roles = ["villager", "villager", "villager", "villager", "demons", "demonLeader", "inspector", "doctor"];
+      roles = ["villager", "villager", "villager", "villager", "demon", "demonLeader", "inspector", "doctor"];
       // Add more villagers for larger games
       for (let i = 8; i < playerCount; i++) {
         roles.push("villager");
       }
     }
-
     // Shuffle roles
     const shuffled = [...roles].sort(() => Math.random() - 0.5);
-
     // Assign roles to players
     this.players.forEach((player, index) => {
       player.role = shuffled[index] || "villager";
       player.isAlive = true;
+
+      io.to(player.id).emit("your-role", {
+        sessionId: this.sessionId,
+        player: this.players.find((p) => p.id === player.id),
+      });
     });
   }
 
@@ -234,15 +237,11 @@ io.on("connection", (socket) => {
     });
 
     io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
-
-    console.log(`Session created: ${sessionId} by ${playerName}`);
-    console.log(`Session Players: ${gameSession.players.map((p) => p.name).join(", ")}`);
   });
 
   // Handle joining an existing game session
   socket.on("join-session", (data) => {
     const { sessionId, playerName } = data;
-    console.log(`Player ${playerName} attempting to join session: ${sessionId}`);
     const gameSession = gameSessions.get(sessionId);
 
     if (!gameSession) {
@@ -279,7 +278,6 @@ io.on("connection", (socket) => {
 
     // Notify all players in the session
     io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
-    console.log(`Player ${playerName} joined session: ${sessionId}`);
   });
 
   // Handle game start
