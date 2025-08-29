@@ -26,27 +26,35 @@ class GameSession {
     this.sessionId = sessionId;
     this.players = [];
     this.gameState = "lobby";
-    this.timeOfDay = "day";
+    this.gamePhase = "day";
     this.dayCount = 1;
     this.votes = {};
     this.nightActions = {};
     this.chatMessages = [];
     this.createdAt = new Date();
     this.hostId = hostId;
+    this.timer = null;
   }
 
   clearVotes() {
     this.votes = {};
   }
+
+  setPhase(phase) {
+    this.gamePhase = phase;
+  }
+
   assignRoles() {
     const playerCount = this.players.length;
     let roles = [];
 
     // Determine roles based on player count
     if (playerCount >= 5 && playerCount <= 7) {
-      roles = ["villager", "villager", "villager", "demon", "inspector", "doctor"];
+      roles = ["villager", "villager", "villager", "demons", "inspector", "doctor"];
+    } else if (playerCount == 2) {
+      roles = ["villager", "demons"];
     } else if (playerCount >= 8) {
-      roles = ["villager", "villager", "villager", "villager", "demon", "demonLeader", "inspector", "doctor"];
+      roles = ["villager", "villager", "villager", "villager", "demons", "demonLeader", "inspector", "doctor"];
       // Add more villagers for larger games
       for (let i = 8; i < playerCount; i++) {
         roles.push("villager");
@@ -64,11 +72,11 @@ class GameSession {
   }
 
   resolveNightActions() {
-    // Count demon votes
+    // Count demons votes
     const demonVotes = {};
     Object.entries(this.nightActions).forEach(([playerId, action]) => {
       const player = this.players.find((p) => p.id === playerId);
-      if (player && (player.role === "demon" || player.role === "demonLeader") && action.actionType === "kill") {
+      if (player && (player.role === "demons" || player.role === "demonLeader") && action.actionType === "kill") {
         demonVotes[action.targetId] = (demonVotes[action.targetId] || 0) + 1;
       }
     });
@@ -104,9 +112,9 @@ class GameSession {
   }
 
   checkWinConditions() {
-    const aliveDemons = this.players.filter((p) => (p.role === "demon" || p.role === "demonLeader") && p.isAlive);
+    const aliveDemons = this.players.filter((p) => (p.role === "demons" || p.role === "demonLeader") && p.isAlive);
 
-    const aliveVillagers = this.players.filter((p) => p.role !== "demon" && p.role !== "demonLeader" && p.isAlive);
+    const aliveVillagers = this.players.filter((p) => p.role !== "demons" && p.role !== "demonLeader" && p.isAlive);
 
     if (aliveDemons.length === 0) {
       // Villagers win
@@ -133,10 +141,50 @@ class GameSession {
       gameState: this.gameState,
       timeOfDay: this.timeOfDay,
       dayCount: this.dayCount,
-      chatMessages: this.chatMessages.slice(-50), // Last 50 messages
+      chatMessages: this.chatMessages.slice(-50),
       winner: this.winner,
       playerCount: this.players.length,
     };
+  }
+
+  startDayPhase() {
+    this.setPhase("day");
+    this.clearVotes();
+
+    io.to(this.sessionId).emit("phase-change", { phase: "day", duration: 5 });
+
+    this.timer = setTimeout(() => {
+      this.startNightPhase();
+    }, 5 * 1000);
+  }
+
+  startNightPhase() {
+    this.setPhase("demons");
+    io.to(this.sessionId).emit("phase-change", { phase: "demons", duration: 5 });
+
+    this.timer = setTimeout(() => {
+      this.startInspectorPhase();
+    }, 5 * 1000);
+  }
+
+  startInspectorPhase() {
+    this.setPhase("inspector");
+    io.to(this.sessionId).emit("phase-change", { phase: "inspector", duration: 5 });
+
+    this.timer = setTimeout(() => {
+      this.startDoctorPhase();
+    }, 5 * 1000);
+  }
+
+  startDoctorPhase() {
+    this.setPhase("doctor");
+    io.to(this.sessionId).emit("phase-change", { phase: "doctor", duration: 5 });
+
+    this.timer = setTimeout(() => {
+      this.resolveNightActions();
+      this.dayCount += 1;
+      this.startDayPhase();
+    }, 5 * 1000);
   }
 }
 
@@ -250,31 +298,32 @@ io.on("connection", (socket) => {
 
     gameSession.gameState = "playing";
     gameSession.assignRoles();
+    gameSession.startDayPhase();
 
     io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
     console.log(`Game started in session: ${sessionId}`);
   });
 
-  // Handle time toggle (day/night)
-  socket.on("toggle-time", (sessionId) => {
-    const gameSession = gameSessions.get(sessionId);
+  // // Handle time toggle (day/night)
+  // socket.on("toggle-time", (sessionId) => {
+  //   const gameSession = gameSessions.get(sessionId);
 
-    if (!gameSession || gameSession.hostId !== socket.id) {
-      socket.emit("error", { message: "Not authorized to toggle time" });
-      return;
-    }
+  //   if (!gameSession || gameSession.hostId !== socket.id) {
+  //     socket.emit("error", { message: "Not authorized to toggle time" });
+  //     return;
+  //   }
 
-    gameSession.timeOfDay = gameSession.timeOfDay === "day" ? "night" : "day";
-    if (gameSession.timeOfDay === "day") {
-      gameSession.dayCount++;
-      gameSession.resolveNightActions();
-    } else {
-      gameSession.nightActions = {};
-    }
-    gameSession.votes = {};
+  //   gameSession.timeOfDay = gameSession.timeOfDay === "day" ? "night" : "day";
+  //   if (gameSession.timeOfDay === "day") {
+  //     gameSession.dayCount++;
+  //     gameSession.resolveNightActions();
+  //   } else {
+  //     gameSession.nightActions = {};
+  //   }
+  //   gameSession.votes = {};
 
-    io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
-  });
+  //   io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
+  // });
 
   // Handle voting
   socket.on("vote", (data) => {

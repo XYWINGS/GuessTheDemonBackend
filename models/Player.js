@@ -5,7 +5,7 @@ const playerSchema = new mongoose.Schema({
   isHost: { type: Boolean, default: false },
   role: {
     type: String,
-    enum: ["villager", "demon", "demonLeader", "inspector", "doctor", "vampire"],
+    enum: ["villager", "demons", "demonLeader", "inspector", "doctor", "vampire"],
     default: "villager",
   },
   alive: { type: Boolean, default: true },
