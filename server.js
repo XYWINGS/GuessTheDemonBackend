@@ -75,7 +75,7 @@ class GameSession {
   }
 
   resolveNightActions() {
-    // Count demons votes
+    // Count demon's votes
     const demonVotes = {};
     Object.entries(this.nightActions).forEach(([playerId, action]) => {
       const player = this.players.find((p) => p.id === playerId);
@@ -153,18 +153,15 @@ class GameSession {
   startDayPhase() {
     this.setPhase("day");
     this.clearVotes();
-
     io.to(this.sessionId).emit("phase-change", { phase: "day", duration: 5 });
-
     this.timer = setTimeout(() => {
-      this.startNightPhase();
+      this.startDemonsPhase();
     }, 5 * 1000);
   }
 
-  startNightPhase() {
+  startDemonsPhase() {
     this.setPhase("demons");
     io.to(this.sessionId).emit("phase-change", { phase: "demons", duration: 5 });
-
     this.timer = setTimeout(() => {
       this.startInspectorPhase();
     }, 5 * 1000);
@@ -173,7 +170,6 @@ class GameSession {
   startInspectorPhase() {
     this.setPhase("inspector");
     io.to(this.sessionId).emit("phase-change", { phase: "inspector", duration: 5 });
-
     this.timer = setTimeout(() => {
       this.startDoctorPhase();
     }, 5 * 1000);
@@ -182,7 +178,6 @@ class GameSession {
   startDoctorPhase() {
     this.setPhase("doctor");
     io.to(this.sessionId).emit("phase-change", { phase: "doctor", duration: 5 });
-
     this.timer = setTimeout(() => {
       this.resolveNightActions();
       this.dayCount += 1;
@@ -301,27 +296,6 @@ io.on("connection", (socket) => {
     io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
     console.log(`Game started in session: ${sessionId}`);
   });
-
-  // // Handle time toggle (day/night)
-  // socket.on("toggle-time", (sessionId) => {
-  //   const gameSession = gameSessions.get(sessionId);
-
-  //   if (!gameSession || gameSession.hostId !== socket.id) {
-  //     socket.emit("error", { message: "Not authorized to toggle time" });
-  //     return;
-  //   }
-
-  //   gameSession.timeOfDay = gameSession.timeOfDay === "day" ? "night" : "day";
-  //   if (gameSession.timeOfDay === "day") {
-  //     gameSession.dayCount++;
-  //     gameSession.resolveNightActions();
-  //   } else {
-  //     gameSession.nightActions = {};
-  //   }
-  //   gameSession.votes = {};
-
-  //   io.to(sessionId).emit("game-state-update", gameSession.getPublicData());
-  // });
 
   // Handle voting
   socket.on("vote", (data) => {
