@@ -53,6 +53,8 @@ class GameSession {
       roles = ["villager", "villager", "villager", "demon", "inspector", "doctor"];
     } else if (playerCount == 2) {
       roles = ["villager", "demon"];
+    } else if (playerCount == 4) {
+      roles = ["villager", "demon", "inspector", "doctor"];
     } else if (playerCount >= 8) {
       roles = ["villager", "villager", "villager", "villager", "demon", "demonLeader", "inspector", "doctor"];
       // Add more villagers for larger games
@@ -75,43 +77,100 @@ class GameSession {
   }
 
   resolveNightActions() {
-    // Count demon's votes
+    console.log("=== Resolving Night Actions ===");
+    console.log("All night actions:", this.nightActions);
+
     const demonVotes = {};
+    let doctorTarget = null;
+    let inspectorResults = [];
+
+    // Collect all actions
     Object.entries(this.nightActions).forEach(([playerId, action]) => {
       const player = this.players.find((p) => p.id === playerId);
-      if (player && (player.role === "demons" || player.role === "demonLeader") && action.actionType === "kill") {
-        demonVotes[action.targetId] = (demonVotes[action.targetId] || 0) + 1;
+      if (!player || !player.isAlive) {
+        console.log(`Skipping action from dead/missing player ${playerId}`);
+        return;
+      }
+
+      console.log(`Processing action from ${player.role} (${playerId}) ->`, action);
+
+      switch (action.actionType) {
+        case "kill":
+          if (player.role === "demons" || player.role === "demonLeader") {
+            demonVotes[action.targetId] = (demonVotes[action.targetId] || 0) + 1;
+            console.log(`Demon vote: ${playerId} voted to kill ${action.targetId}`);
+          }
+          break;
+
+        case "save":
+          if (player.role === "doctor") {
+            doctorTarget = action.targetId;
+            console.log(`Doctor (${playerId}) chose to save ${doctorTarget}`);
+          }
+          break;
+
+        case "investigate":
+          if (player.role === "inspector") {
+            const target = this.players.find((p) => p.id === action.targetId);
+            if (target) {
+              const result = target.role === "demons" ? "demon" : "villager";
+              inspectorResults.push({
+                inspectorId: playerId,
+                targetId: target.id,
+                result,
+              });
+              console.log(`Inspector (${playerId}) investigated ${target.id} -> ${result}`);
+            }
+          }
+          break;
+
+        default:
+          console.log(`Unknown action type: ${action.actionType}`);
+          break;
       }
     });
 
-    // Find player with most votes to be killed
+    // Decide demon target
     let targetToKill = null;
     let maxVotes = 0;
     Object.entries(demonVotes).forEach(([targetId, votes]) => {
+      console.log(`Demon votes for ${targetId}: ${votes}`);
       if (votes > maxVotes) {
         maxVotes = votes;
         targetToKill = targetId;
       }
     });
 
-    // Check if doctor saved the target
-    const doctorAction = Object.values(this.nightActions).find((action) => action.actionType === "save");
+    console.log("Target chosen to kill (before doctor check):", targetToKill);
 
-    if (doctorAction && doctorAction.targetId === targetToKill) {
-      // Doctor saved the target
+    // Check doctor save
+    if (doctorTarget && targetToKill === doctorTarget) {
+      console.log(`Doctor saved ${doctorTarget}! No one dies tonight.`);
       targetToKill = null;
     }
 
-    // Kill the player
+    // Apply kill
     if (targetToKill) {
-      const player = this.players.find((p) => p.id === targetToKill);
-      if (player) {
-        player.isAlive = false;
+      const victim = this.players.find((p) => p.id === targetToKill);
+      if (victim) {
+        victim.isAlive = false;
+        console.log(`Player ${victim.id} (${victim.role}) has been killed!`);
       }
     }
 
+    // Inspector results
+    inspectorResults.forEach((res) => {
+      console.log(`Inspector ${res.inspectorId} result: ${res.targetId} is ${res.result}`);
+      // later: emit back to inspector client
+    });
+
+    // Reset night actions
+    this.nightActions = {};
+    console.log("Night actions reset.");
+
     // Check win conditions
     this.checkWinConditions();
+    console.log("=== Night Actions Resolved ===");
   }
 
   checkWinConditions() {
@@ -128,6 +187,7 @@ class GameSession {
       this.gameState = "ended";
       this.winner = "demons";
     }
+    this.startDayPhase();
   }
 
   // Get public data (without sensitive information)
@@ -179,10 +239,13 @@ class GameSession {
     this.setPhase("doctor");
     io.to(this.sessionId).emit("phase-change", { phase: "doctor", duration: 5 });
     this.timer = setTimeout(() => {
-      this.resolveNightActions();
       this.dayCount += 1;
-      this.startDayPhase();
+      this.startNightActions();
     }, 5 * 1000);
+  }
+
+  startNightActions() {
+    this.resolveNightActions();
   }
 }
 
