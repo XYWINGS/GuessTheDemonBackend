@@ -82,7 +82,7 @@ class GameSession {
 
     const demonVotes = {};
     let doctorTarget = null;
-    let inspectorResults = [];
+    let inspectorResult = {};
 
     // Collect all actions
     Object.entries(this.nightActions).forEach(([playerId, action]) => {
@@ -113,12 +113,13 @@ class GameSession {
           if (player.role === "inspector") {
             const target = this.players.find((p) => p.id === action.targetId);
             if (target) {
-              const result = target.role === "demons" ? "demon" : "villager";
-              inspectorResults.push({
+              const result = target.role === "demon" ? "demon" : "villager";
+              inspectorResult = {
                 inspectorId: playerId,
                 targetId: target.id,
+                targetName: target.name,
                 result,
-              });
+              };
               console.log(`Inspector (${playerId}) investigated ${target.id} -> ${result}`);
             }
           }
@@ -159,10 +160,14 @@ class GameSession {
     }
 
     // Inspector results
-    inspectorResults.forEach((res) => {
-      console.log(`Inspector ${res.inspectorId} result: ${res.targetId} is ${res.result}`);
-      // later: emit back to inspector client
-    });
+    if (inspectorResult) {
+      io.to(inspectorResult.inspectorId).emit("investigation-result", {
+        targetId: inspectorResult.targetId,
+        targetName: inspectorResult.targetName,
+        result: inspectorResult.result,
+        inspectorId: inspectorResult.inspectorId,
+      });
+    }
 
     // Reset night actions
     this.nightActions = {};
@@ -174,20 +179,42 @@ class GameSession {
   }
 
   checkWinConditions() {
-    const aliveDemons = this.players.filter((p) => (p.role === "demons" || p.role === "demonLeader") && p.isAlive);
+    console.log("=== Checking Win Conditions ===");
 
-    const aliveVillagers = this.players.filter((p) => p.role !== "demons" && p.role !== "demonLeader" && p.isAlive);
+    const aliveDemons = this.players.filter((p) => (p.role === "demon" || p.role === "demonLeader") && p.isAlive);
 
+    const aliveVillagers = this.players.filter((p) => p.isAlive && p.role !== "demon" && p.role !== "demonLeader");
+
+    console.log(
+      "Alive Demons:",
+      aliveDemons.map((p) => p.id)
+    );
+    console.log(
+      "Alive Villagers:",
+      aliveVillagers.map((p) => p.id)
+    );
+
+    // --- Win conditions ---
     if (aliveDemons.length === 0) {
-      // Villagers win
+      //  Villagers win if no demons left
       this.gameState = "ended";
       this.winner = "villagers";
-    } else if (aliveDemons.length >= aliveVillagers.length) {
-      // Demons win
+      console.log("Villagers win!");
+    } else if (aliveDemons.length >= aliveVillagers.length && aliveDemons.length > 0) {
+      // Demons win if they outnumber/equal villagers
       this.gameState = "ended";
       this.winner = "demons";
+      console.log("Demons win!");
+    } else {
+      // Game continues
+      console.log("No winner yet. Moving to day phase.");
+      this.timer = setTimeout(() => {
+        this.startDayPhase();
+      }, 5 * 1000);
     }
-    this.startDayPhase();
+
+    // io.to(this.sessionId).emit("game-state-update", this.getPublicData());
+    console.log("=== Win Conditions Checked ===");
   }
 
   // Get public data (without sensitive information)
@@ -206,6 +233,7 @@ class GameSession {
       dayCount: this.dayCount,
       chatMessages: this.chatMessages.slice(-50),
       winner: this.winner,
+      gamePhase: this.gamePhase,
       playerCount: this.players.length,
     };
   }
