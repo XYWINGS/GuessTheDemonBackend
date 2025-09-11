@@ -3,7 +3,7 @@ import http from "http";
 import { Server as SocketServer } from "socket.io";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
-import { GameSession } from "./models/Game";
+import { GameSession, GameState } from "./models/Game";
 
 const app = express();
 const server = http.createServer(app);
@@ -143,7 +143,7 @@ io.on("connection", (socket) => {
     //   return;
     // }
 
-    gameSession.gameState = "playing";
+    gameSession.gameState = GameState.PLAYING;
     gameSession.assignRoles();
     gameSession.startDayPhase();
 

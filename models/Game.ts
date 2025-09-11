@@ -16,11 +16,18 @@ export enum Role {
   INSPECTOR = "inspector",
 }
 
+export enum GameState {
+  PRE_LOBBY = "pre-lobby",
+  PLAYING = "playing",
+  LOBBY = "lobby",
+  ENDED = "ended",
+}
+
 export class GameSession {
   io: SocketServer;
   players: any[];
   sessionId: string;
-  gameState: string;
+  gameState: GameState;
   gamePhase: GamePhase;
   dayCount: number;
   votes: { [key: string]: any };
@@ -29,7 +36,7 @@ export class GameSession {
   createdAt: number;
   hostId: string;
   timer: NodeJS.Timeout | null;
-  winner?: string;
+  winningParty: Role | null;
   timeOfDay?: string;
 
   constructor(io: SocketServer, sessionId: string, hostId: string) {
@@ -37,7 +44,7 @@ export class GameSession {
     this.sessionId = sessionId;
     this.hostId = hostId;
     this.players = [];
-    this.gameState = "lobby";
+    this.gameState = GameState.LOBBY;
     this.gamePhase = GamePhase.DAY;
     this.dayCount = 1;
     this.votes = {};
@@ -45,6 +52,7 @@ export class GameSession {
     this.chatMessages = [];
     this.createdAt = Date.now();
     this.timer = null;
+    this.winningParty = null;
   }
   clearVotes() {
     this.votes = {};
@@ -52,6 +60,10 @@ export class GameSession {
 
   setPhase(phase: GamePhase) {
     this.gamePhase = phase;
+  }
+
+  setGameState(state: GameState) {
+    this.gameState = state;
   }
 
   assignRoles() {
@@ -120,8 +132,20 @@ export class GameSession {
       switch (action.actionType) {
         case "kill":
           if (player.role === Role.DEMON || player.role === Role.DEMON_LEADER) {
-            demonVotes[action.targetId] = (demonVotes[action.targetId] || 0) + 1;
-            console.log(`Demon vote: ${playerId} voted to kill ${action.targetId}`);
+            const target = this.players.find((p) => p.id === action.targetId);
+
+            if (!target) {
+              console.warn(`Invalid demon vote: target ${action.targetId} not found`);
+              return;
+            }
+
+            if (target.role === Role.DEMON || target.role === Role.DEMON_LEADER) {
+              console.log(`Demon ${playerId} tried to kill fellow demon ${target.id} — vote ignored`);
+              return;
+            }
+
+            demonVotes[target.id] = (demonVotes[target.id] || 0) + 1;
+            console.log(`Demon vote: ${playerId} voted to kill ${target.id}`);
           }
           break;
 
@@ -220,24 +244,24 @@ export class GameSession {
     // --- Win conditions ---
     if (aliveDemons.length === 0) {
       //  Villagers win if no demons left
-      this.gameState = "ended";
-      this.winner = "villagers";
+      this.gameState = GameState.ENDED;
+      this.winningParty = Role.VILLAGER;
       console.log("Villagers win!");
     } else if (aliveDemons.length >= aliveVillagers.length && aliveDemons.length > 0) {
       // Demons win if they outnumber/equal villagers
-      this.gameState = "ended";
-      this.winner = "demons";
+      this.gameState = GameState.ENDED;
+      this.winningParty = Role.DEMON;
       console.log("Demons win!");
     } else {
       // Game continues
-      console.log("No winner yet. Moving to day phase.");
+      console.log("No winningParty yet. Moving to day phase.");
       this.timer = setTimeout(() => {
         this.startDayPhase();
       }, 5 * 1000);
     }
 
-    // io.to(this.sessionId).emit("game-state-update", this.getPublicData());
     console.log("=== Win Conditions Checked ===");
+    this.io.to(this.sessionId).emit("game-state-update", this.getPublicData());
   }
 
   // Get public data (without sensitive information)
@@ -255,7 +279,7 @@ export class GameSession {
       timeOfDay: this.timeOfDay,
       dayCount: this.dayCount,
       chatMessages: this.chatMessages.slice(-50),
-      winner: this.winner,
+      winningParty: this.winningParty,
       gamePhase: this.gamePhase,
       playerCount: this.players.length,
     };
