@@ -1,7 +1,26 @@
 // Game session class
-class GameSession {
-  constructor(sessionId, hostId) {
+import { Server as SocketServer } from "socket.io";
+
+export class GameSession {
+  io: SocketServer;
+  players: any[];
+  sessionId: string;
+  gameState: string;
+  gamePhase: string;
+  dayCount: number;
+  votes: { [key: string]: any };
+  nightActions: { [key: string]: any };
+  chatMessages: any[];
+  createdAt: number;
+  hostId: string;
+  timer: NodeJS.Timeout | null;
+  winner?: string;
+  timeOfDay?: string;
+
+  constructor(io: SocketServer, sessionId: string, hostId: string) {
+    this.io = io;
     this.sessionId = sessionId;
+    this.hostId = hostId;
     this.players = [];
     this.gameState = "lobby";
     this.gamePhase = "day";
@@ -9,11 +28,9 @@ class GameSession {
     this.votes = {};
     this.nightActions = {};
     this.chatMessages = [];
-    this.createdAt = new Date();
-    this.hostId = hostId;
+    this.createdAt = Date.now();
     this.timer = null;
   }
-
   clearVotes() {
     this.votes = {};
   }
@@ -24,7 +41,7 @@ class GameSession {
 
   assignRoles() {
     const playerCount = this.players.length;
-    let roles = [];
+    let roles: string[] = [];
 
     // Determine roles based on player count
     if (playerCount >= 5 && playerCount <= 7) {
@@ -47,7 +64,7 @@ class GameSession {
       player.role = shuffled[index] || "villager";
       player.isAlive = true;
 
-      io.to(player.id).emit("your-role", {
+      this.io.to(player.id).emit("your-role", {
         sessionId: this.sessionId,
         player: this.players.find((p) => p.id === player.id),
       });
@@ -60,7 +77,20 @@ class GameSession {
 
     const demonVotes = {};
     let doctorTarget = null;
-    let inspectorResult = {};
+
+    type InspectorResult = {
+      inspectorId: string;
+      targetId: string;
+      targetName: string;
+      result: string;
+    };
+
+    let inspectorResult: InspectorResult = {
+      inspectorId: "",
+      targetId: "",
+      targetName: "",
+      result: "",
+    };
 
     // Collect all actions
     Object.entries(this.nightActions).forEach(([playerId, action]) => {
@@ -110,12 +140,13 @@ class GameSession {
     });
 
     // Decide demon target
-    let targetToKill = null;
+    let targetToKill: string | null = null;
     let maxVotes = 0;
     Object.entries(demonVotes).forEach(([targetId, votes]) => {
-      console.log(`Demon votes for ${targetId}: ${votes}`);
-      if (votes > maxVotes) {
-        maxVotes = votes;
+      const voteCount = votes as number;
+      console.log(`Demon votes for ${targetId}: ${voteCount}`);
+      if (voteCount > maxVotes) {
+        maxVotes = voteCount;
         targetToKill = targetId;
       }
     });
@@ -138,8 +169,9 @@ class GameSession {
     }
 
     // Inspector results
+
     if (inspectorResult) {
-      io.to(inspectorResult.inspectorId).emit("investigation-result", {
+      this.io.to(inspectorResult.inspectorId).emit("investigation-result", {
         targetId: inspectorResult.targetId,
         targetName: inspectorResult.targetName,
         result: inspectorResult.result,
@@ -219,7 +251,7 @@ class GameSession {
   startDayPhase() {
     this.setPhase("day");
     this.clearVotes();
-    io.to(this.sessionId).emit("phase-change", { phase: "day", duration: 5 });
+    this.io.to(this.sessionId).emit("phase-change", { phase: "day", duration: 5 });
     this.timer = setTimeout(() => {
       this.startDemonsPhase();
     }, 5 * 1000);
@@ -227,7 +259,7 @@ class GameSession {
 
   startDemonsPhase() {
     this.setPhase("demons");
-    io.to(this.sessionId).emit("phase-change", { phase: "demons", duration: 5 });
+    this.io.to(this.sessionId).emit("phase-change", { phase: "demons", duration: 5 });
     this.timer = setTimeout(() => {
       this.startInspectorPhase();
     }, 5 * 1000);
@@ -235,7 +267,7 @@ class GameSession {
 
   startInspectorPhase() {
     this.setPhase("inspector");
-    io.to(this.sessionId).emit("phase-change", { phase: "inspector", duration: 5 });
+    this.io.to(this.sessionId).emit("phase-change", { phase: "inspector", duration: 5 });
     this.timer = setTimeout(() => {
       this.startDoctorPhase();
     }, 5 * 1000);
@@ -243,7 +275,7 @@ class GameSession {
 
   startDoctorPhase() {
     this.setPhase("doctor");
-    io.to(this.sessionId).emit("phase-change", { phase: "doctor", duration: 5 });
+    this.io.to(this.sessionId).emit("phase-change", { phase: "doctor", duration: 5 });
     this.timer = setTimeout(() => {
       this.dayCount += 1;
       this.startNightActions();

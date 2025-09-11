@@ -1,13 +1,14 @@
-// server/index.js (with multi-game support)
-const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
-const cors = require("cors");
-const { v4: uuidv4 } = require("uuid");
+import express from "express";
+import http from "http";
+import { Server as SocketServer } from "socket.io";
+import cors from "cors";
+import { v4 as uuidv4 } from "uuid";
+import { GameSession } from "./models/Game";
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
+
+const io = new SocketServer(server, {
   cors: {
     origin: "http://localhost:3000",
     methods: ["GET", "POST"],
@@ -18,19 +19,20 @@ app.use(cors());
 app.use(express.json());
 
 // Store multiple game sessions
-const gameSessions = new Map();
+const gameSessions: Map<string, GameSession> = new Map();
 
 // Clean up inactive sessions periodically
 setInterval(() => {
-  const now = new Date();
-  const inactiveSessions = [];
+  const inactiveSessions: string[] = [];
+
+  const now = new Date().getTime(); // number (ms since epoch)
 
   gameSessions.forEach((session, sessionId) => {
-    // Remove sessions inactive for more than 1 hours
     if (now - session.createdAt > 60 * 60 * 1000) {
       inactiveSessions.push(sessionId);
     }
   });
+
   inactiveSessions.forEach((sessionId) => {
     gameSessions.delete(sessionId);
   });
@@ -39,7 +41,7 @@ setInterval(() => {
 
 // Broadcast updated session info to all connected clients
 const broadcastSessionInfo = () => {
-  const sessionsList = [];
+  const sessionsList: { sessionId: string; playerCount: number; hostName: string }[] = [];
 
   gameSessions.forEach((session, sessionId) => {
     if (session.gameState === "lobby") {
@@ -61,7 +63,7 @@ io.on("connection", (socket) => {
   // Handle creating a new game session
   socket.on("create-session", (playerName) => {
     const sessionId = uuidv4();
-    const gameSession = new GameSession(sessionId, socket.id);
+    const gameSession = new GameSession(io, sessionId, socket.id);
 
     // Add host to the session
     gameSession.players.push({
@@ -196,9 +198,15 @@ io.on("connection", (socket) => {
     }
   });
 
+  type SessionBasic = {
+    sessionId: string;
+    playerCount: number;
+    hostName: string;
+    createdAt: number;
+  };
   // Handle session list request
   socket.on("get-sessions", () => {
-    const sessionsList = [];
+    const sessionsList: SessionBasic[] = [];
 
     gameSessions.forEach((session, sessionId) => {
       if (session.gameState === "lobby") {
@@ -206,6 +214,7 @@ io.on("connection", (socket) => {
           sessionId,
           playerCount: session.players.length,
           hostName: session.players.find((p) => p.isHost)?.name || "Unknown",
+          createdAt: session.createdAt,
         });
       }
     });
@@ -245,23 +254,23 @@ io.on("connection", (socket) => {
   });
 });
 
-// HTTP endpoint to get active sessions
-app.get("/sessions", (req, res) => {
-  const sessionsList = [];
+// // HTTP endpoint to get active sessions
+// app.get("/sessions", (req, res) => {
+//   const sessionsList:SessionBasic[] = [];
 
-  gameSessions.forEach((session, sessionId) => {
-    if (session.gameState === "lobby") {
-      sessionsList.push({
-        sessionId,
-        playerCount: session.players.length,
-        hostName: session.players.find((p) => p.isHost)?.name || "Unknown",
-        createdAt: session.createdAt,
-      });
-    }
-  });
+//   gameSessions.forEach((session, sessionId) => {
+//     if (session.gameState === "lobby") {
+//       sessionsList.push({
+//         sessionId,
+//         playerCount: session.players.length,
+//         hostName: session.players.find((p) => p.isHost)?.name || "Unknown",
+//         createdAt: session.createdAt,
+//       });
+//     }
+//   });
 
-  res.json(sessionsList);
-});
+//   res.json(sessionsList);
+// });
 
 //Serve4 configs
 const PORT = process.env.PORT || 3001;
