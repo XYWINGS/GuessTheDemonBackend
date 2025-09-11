@@ -254,24 +254,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// // HTTP endpoint to get active sessions
-// app.get("/sessions", (req, res) => {
-//   const sessionsList:SessionBasic[] = [];
-
-//   gameSessions.forEach((session, sessionId) => {
-//     if (session.gameState === "lobby") {
-//       sessionsList.push({
-//         sessionId,
-//         playerCount: session.players.length,
-//         hostName: session.players.find((p) => p.isHost)?.name || "Unknown",
-//         createdAt: session.createdAt,
-//       });
-//     }
-//   });
-
-//   res.json(sessionsList);
-// });
-
 //Serve4 configs
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
