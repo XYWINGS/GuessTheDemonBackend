@@ -33,6 +33,7 @@ export class GameSession {
     this.timer = null;
     this.winningParty = null;
   }
+
   clearVotes() {
     this.votes = {};
   }
@@ -215,7 +216,6 @@ export class GameSession {
     this.io.to(this.sessionId).emit("game-state-update", this.getPublicData());
   }
 
-  // Get public data (without sensitive information)
   getPublicData() {
     return {
       sessionId: this.sessionId,
@@ -236,9 +236,33 @@ export class GameSession {
     };
   }
 
+  resolveVotes() {
+    const voteCounts: Record<string, number> = {};
+
+    Object.values(this.votes).forEach((targetId) => {
+      voteCounts[targetId] = (voteCounts[targetId] ?? 0) + 1;
+    });
+
+    const [targetId] = Object.entries(voteCounts).sort((a, b) => b[1] - a[1])[0] || [];
+
+    if (targetId) {
+      const victim = this.players.find((p) => p.id === targetId);
+      if (victim) {
+        victim.isAlive = false;
+
+        this.io.to(victim.id).emit("your-role", {
+          sessionId: this.sessionId,
+          player: victim,
+        });
+      }
+    }
+    this.io.to(this.sessionId).emit("game-state-update", this.getPublicData());
+    this.clearVotes();
+  }
+
   startDayPhase() {
     this.setPhase(GamePhase.DAY);
-    this.clearVotes();
+    this.resolveVotes();
     this.io.to(this.sessionId).emit("phase-change", { phase: GamePhase.DAY, duration: 5 });
     this.timer = setTimeout(() => {
       this.startDemonsPhase();

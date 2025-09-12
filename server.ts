@@ -3,8 +3,8 @@ import cors from "cors";
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
 import { GameSession } from "./models/Game";
-import { GameState } from "./configs/configs";
 import { Server as SocketServer } from "socket.io";
+import { GameState, PhaseDelay, SessionBasic } from "./configs/configs";
 
 const app = express();
 const server = http.createServer(app);
@@ -19,14 +19,13 @@ const io = new SocketServer(server, {
 app.use(cors());
 app.use(express.json());
 
-// Store multiple game sessions
 const gameSessions: Map<string, GameSession> = new Map();
 
 // Clean up inactive sessions periodically
 setInterval(() => {
   const inactiveSessions: string[] = [];
 
-  const now = new Date().getTime(); // number (ms since epoch)
+  const now = new Date().getTime();
 
   gameSessions.forEach((session, sessionId) => {
     if (now - session.createdAt > 60 * 60 * 1000) {
@@ -38,7 +37,7 @@ setInterval(() => {
     gameSessions.delete(sessionId);
   });
   broadcastSessionInfo();
-}, 5 * 1000); // Check every  5 seconds
+}, PhaseDelay.INACTIVE_DELAY * 1000);
 
 // Broadcast updated session info to all connected clients
 const broadcastSessionInfo = () => {
@@ -155,14 +154,9 @@ io.on("connection", (socket) => {
   // Handle voting
   socket.on("vote", (data) => {
     const { voterName, sessionId, voterId, targetId, targetName } = data;
-    console.log(`Vote in session ${sessionId} from ${voterName} to ${targetName}`);
-    console.log(`Vote in session data ${data}`);
-
     const gameSession = gameSessions.get(sessionId);
-
     if (!gameSession) return;
-
-    gameSession.votes[voterId] = targetId;
+    gameSession.votes[voterId] = { targetId, targetName, voterName };
     io.to(sessionId).emit("vote-update", gameSession.votes);
   });
 
@@ -199,12 +193,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  type SessionBasic = {
-    sessionId: string;
-    playerCount: number;
-    hostName: string;
-    createdAt: number;
-  };
   // Handle session list request
   socket.on("get-sessions", () => {
     const sessionsList: SessionBasic[] = [];

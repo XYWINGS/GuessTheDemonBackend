@@ -20,9 +20,17 @@ export enum GameState {
   ENDED = "ended",
 }
 
-export enum PhaseDelay{
-  DAY = 10,
-  DEMONS = 5,
-  DOCTOR = 5,
-  INSPECTOR = 5,
+export enum PhaseDelay {
+  DAY = 20,
+  DEMONS = 2,
+  DOCTOR = 2,
+  INSPECTOR = 2,
+  INACTIVE_DELAY = 5,
 }
+
+export type SessionBasic = {
+  sessionId: string;
+  playerCount: number;
+  hostName: string;
+  createdAt: number;
+};
