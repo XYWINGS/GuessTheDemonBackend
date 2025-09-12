@@ -1,6 +1,6 @@
 // Game session class
 import { Server as SocketServer } from "socket.io";
-import { GamePhase, GameState, Role } from "../configs/configs";
+import { GamePhase, GameState, PhaseDelay, Role } from "../configs/configs";
 
 export class GameSession {
   io: SocketServer;
@@ -242,7 +242,7 @@ export class GameSession {
     this.io.to(this.sessionId).emit("phase-change", { phase: GamePhase.DAY, duration: 5 });
     this.timer = setTimeout(() => {
       this.startDemonsPhase();
-    }, 5 * 1000);
+    }, PhaseDelay.DAY * 1000);
   }
 
   startDemonsPhase() {
@@ -250,7 +250,7 @@ export class GameSession {
     this.io.to(this.sessionId).emit("phase-change", { phase: GamePhase.DEMONS, duration: 5 });
     this.timer = setTimeout(() => {
       this.startInspectorPhase();
-    }, 5 * 1000);
+    }, PhaseDelay.DEMONS * 1000);
   }
 
   startInspectorPhase() {
@@ -258,7 +258,7 @@ export class GameSession {
     this.io.to(this.sessionId).emit("phase-change", { phase: GamePhase.INSPECTOR, duration: 5 });
     this.timer = setTimeout(() => {
       this.startDoctorPhase();
-    }, 5 * 1000);
+    }, PhaseDelay.INSPECTOR * 1000);
   }
 
   startDoctorPhase() {
@@ -267,7 +267,7 @@ export class GameSession {
     this.timer = setTimeout(() => {
       this.dayCount += 1;
       this.startNightActions();
-    }, 5 * 1000);
+    }, PhaseDelay.DOCTOR * 1000);
   }
 
   startNightActions() {

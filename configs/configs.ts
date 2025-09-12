@@ -19,3 +19,10 @@ export enum GameState {
   LOBBY = "lobby",
   ENDED = "ended",
 }
+
+export enum PhaseDelay{
+  DAY = 10,
+  DEMONS = 5,
+  DOCTOR = 5,
+  INSPECTOR = 5,
+}
