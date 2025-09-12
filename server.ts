@@ -1,9 +1,10 @@
-import express from "express";
 import http from "http";
-import { Server as SocketServer } from "socket.io";
 import cors from "cors";
+import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import { GameSession, GameState } from "./models/Game";
+import { GameSession } from "./models/Game";
+import { GameState } from "./configs/configs";
+import { Server as SocketServer } from "socket.io";
 
 const app = express();
 const server = http.createServer(app);
@@ -242,12 +243,10 @@ io.on("connection", (socket) => {
 
         // Notify remaining players
         io.to(sessionId).emit("game-state-update", session.getPublicData());
-        console.log(`Player ${player.name} removed from session: ${sessionId}`);
 
         // Remove empty sessions
         if (session.players.length === 0) {
           gameSessions.delete(sessionId);
-          console.log(`Session ${sessionId} removed (no players)`);
         }
       }
     });
