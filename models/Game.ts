@@ -202,6 +202,10 @@ export class GameSession {
       if (victim) {
         victim.isAlive = false;
         console.log(`Player ${victim.id} (${victim.role}) has been killed!`);
+        this.io.to(targetToKill).emit("your-role", {
+          sessionId: this.sessionId,
+          player: victim,
+        });
       }
     }
 
