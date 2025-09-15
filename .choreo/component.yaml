@@ -1,0 +1,9 @@
+endpoints:
+  - name: guess_the_demons_backend
+    displayName: Guess the Demons Backend
+    service:
+      basePath: /
+      port: 8090
+    type: WS
+    networkVisibilities:
+      - Public
