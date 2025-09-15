@@ -1,8 +1,452 @@
 asyncapi: '2.0.0'
 info:
-  title: 'Guess The Demon Backend'
-  version: 1.0.0
+  title: Werewolf Game API
+  version: '1.0.0'
+  description: |
+    Real-time WebSocket API for a Werewolf (Mafia) social deduction game.
+    Players can create sessions, join games, vote, perform night actions, and chat.
+
 servers:
-  localhost:
-    url: localhost
-    protocol: ws
+  production:
+    url: localhost:3001
+    protocol: socket.io
+    description: Production game server
+    bindings:
+      socketio:
+        pollingTimeout: 20000
+        maxHttpBufferSize: 1000000
+        cors:
+          origin: "http://localhost:3000"
+          methods: ["GET", "POST"]
+
+defaultContentType: application/json
+
+channels:
+  /:
+    address: /
+    messages:
+      createSession:
+        $ref: '#/components/messages/createSession'
+      sessionCreated:
+        $ref: '#/components/messages/sessionCreated'
+      joinSession:
+        $ref: '#/components/messages/joinSession'
+      sessionJoined:
+        $ref: '#/components/messages/sessionJoined'
+      startGame:
+        $ref: '#/components/messages/startGame'
+      vote:
+        $ref: '#/components/messages/vote'
+      voteUpdate:
+        $ref: '#/components/messages/voteUpdate'
+      nightAction:
+        $ref: '#/components/messages/nightAction'
+      chatMessage:
+        $ref: '#/components/messages/chatMessage'
+      getSessions:
+        $ref: '#/components/messages/getSessions'
+      sessionsList:
+        $ref: '#/components/messages/sessionsList'
+      gameStateUpdate:
+        $ref: '#/components/messages/gameStateUpdate'
+      yourRole:
+        $ref: '#/components/messages/yourRole'
+      investigationResult:
+        $ref: '#/components/messages/investigationResult'
+      phaseChange:
+        $ref: '#/components/messages/phaseChange'
+      error:
+        $ref: '#/components/messages/error'
+
+operations:
+  createSessionOperation:
+    action: receive
+    channel:
+      $ref: '#/channels/%2F'
+    messages:
+      - $ref: '#/components/messages/createSession'
+    reply:
+      channel:
+        $ref: '#/channels/%2F'
+      messages:
+        - $ref: '#/components/messages/sessionCreated'
+        - $ref: '#/components/messages/error'
+
+  joinSessionOperation:
+    action: receive
+    channel:
+      $ref: '#/channels/%2F'
+    messages:
+      - $ref: '#/components/messages/joinSession'
+    reply:
+      channel:
+        $ref: '#/channels/%2F'
+      messages:
+        - $ref: '#/components/messages/sessionJoined'
+        - $ref: '#/components/messages/error'
+
+  startGameOperation:
+    action: receive
+    channel:
+      $ref: '#/channels/%2F'
+    messages:
+      - $ref: '#/components/messages/startGame'
+    reply:
+      channel:
+        $ref: '#/channels/%2F'
+      messages:
+        - $ref: '#/components/messages/error'
+
+  voteOperation:
+    action: receive
+    channel:
+      $ref: '#/channels/%2F'
+    messages:
+      - $ref: '#/components/messages/vote'
+
+  nightActionOperation:
+    action: receive
+    channel:
+      $ref: '#/channels/%2F'
+    messages:
+      - $ref: '#/components/messages/nightAction'
+
+  chatMessageOperation:
+    action: receive
+    channel:
+      $ref: '#/channels/%2F'
+    messages:
+      - $ref: '#/components/messages/chatMessage'
+
+  getSessionsOperation:
+    action: receive
+    channel:
+      $ref: '#/channels/%2F'
+    messages:
+      - $ref: '#/components/messages/getSessions'
+    reply:
+      channel:
+        $ref: '#/channels/%2F'
+      messages:
+        - $ref: '#/components/messages/sessionsList'
+
+components:
+  messages:
+    createSession:
+      name: create-session
+      title: Create Game Session
+      summary: Request to create a new game session
+      payload:
+        type: string
+        description: Player name for the host
+        examples:
+          - "PlayerHostName"
+
+    sessionCreated:
+      name: session-created
+      title: Session Created
+      summary: Response when a session is successfully created
+      payload:
+        type: object
+        properties:
+          sessionId:
+            type: string
+            format: uuid
+            description: Unique identifier for the game session
+          player:
+            $ref: '#/components/schemas/Player'
+
+    joinSession:
+      name: join-session
+      title: Join Game Session
+      summary: Request to join an existing game session
+      payload:
+        type: object
+        properties:
+          sessionId:
+            type: string
+            format: uuid
+            description: ID of the session to join
+          playerName:
+            type: string
+            description: Name of the joining player
+
+    sessionJoined:
+      name: session-joined
+      title: Session Joined
+      summary: Response when a player successfully joins a session
+      payload:
+        type: object
+        properties:
+          sessionId:
+            type: string
+            format: uuid
+            description: ID of the joined session
+          player:
+            $ref: '#/components/schemas/Player'
+
+    startGame:
+      name: start-game
+      title: Start Game
+      summary: Request from host to start the game
+      payload:
+        type: string
+        format: uuid
+        description: ID of the session to start
+
+    vote:
+      name: vote
+      title: Player Vote
+      summary: A player's vote during day phase
+      payload:
+        type: object
+        properties:
+          voterName:
+            type: string
+            description: Name of the voter
+          sessionId:
+            type: string
+            format: uuid
+            description: ID of the session
+          voterId:
+            type: string
+            description: Socket ID of the voter
+          targetId:
+            type: string
+            description: Socket ID of the vote target
+          targetName:
+            type: string
+            description: Name of the vote target
+
+    voteUpdate:
+      name: vote-update
+      title: Vote Update
+      summary: Broadcast of current vote status to all players
+      payload:
+        type: object
+        additionalProperties:
+          type: object
+          properties:
+            targetId:
+              type: string
+            targetName:
+              type: string
+            voterName:
+              type: string
+
+    nightAction:
+      name: night-action
+      title: Night Action
+      summary: A player's action during night phase
+      payload:
+        type: object
+        properties:
+          sessionId:
+            type: string
+            format: uuid
+            description: ID of the session
+          playerId:
+            type: string
+            description: Socket ID of the acting player
+          targetId:
+            type: string
+            description: Socket ID of the target
+          actionType:
+            type: string
+            enum: [kill, save, investigate]
+            description: Type of night action
+
+    chatMessage:
+      name: chat-message
+      title: Chat Message
+      summary: A player's chat message
+      payload:
+        type: object
+        properties:
+          sessionId:
+            type: string
+            format: uuid
+            description: ID of the session
+          playerId:
+            type: string
+            description: Socket ID of the sender
+          message:
+            type: string
+            description: Chat message content
+
+    getSessions:
+      name: get-sessions
+      title: Get Sessions
+      summary: Request for the list of available game sessions
+      payload:
+        type: null
+        description: No payload required
+
+    sessionsList:
+      name: sessions-list
+      title: Sessions List
+      summary: Response with list of available game sessions
+      payload:
+        type: array
+        items:
+          $ref: '#/components/schemas/SessionBasic'
+
+    gameStateUpdate:
+      name: game-state-update
+      title: Game State Update
+      summary: Broadcast of the current game state to all players in a session
+      payload:
+        $ref: '#/components/schemas/GameState'
+
+    yourRole:
+      name: your-role
+      title: Your Role
+      summary: Private message to a player revealing their role
+      payload:
+        type: object
+        properties:
+          sessionId:
+            type: string
+            format: uuid
+            description: ID of the session
+          player:
+            $ref: '#/components/schemas/Player'
+
+    investigationResult:
+      name: investigation-result
+      title: Investigation Result
+      summary: Result of an inspector's investigation
+      payload:
+        type: object
+        properties:
+          targetId:
+            type: string
+            description: ID of the investigated player
+          targetName:
+            type: string
+            description: Name of the investigated player
+          result:
+            type: string
+            enum: [demon, villager]
+            description: Result of the investigation
+          inspectorId:
+            type: string
+            description: ID of the inspector
+
+    phaseChange:
+      name: phase-change
+      title: Phase Change
+      summary: Notification of game phase change
+      payload:
+        type: object
+        properties:
+          phase:
+            type: string
+            enum: [day, demons, inspector, doctor]
+            description: New game phase
+          duration:
+            type: integer
+            description: Duration of the phase in seconds
+
+    error:
+      name: error
+      title: Error
+      summary: Error response for failed operations
+      payload:
+        type: object
+        properties:
+          message:
+            type: string
+            description: Error description
+
+  schemas:
+    Player:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Socket ID of the player
+        name:
+          type: string
+          description: Player's display name
+        role:
+          type: string
+          nullable: true
+          enum: [villager, demon, demonLeader, inspector, doctor, null]
+          description: Player's role (null if not revealed)
+        isAlive:
+          type: boolean
+          description: Whether the player is alive
+        isHost:
+          type: boolean
+          description: Whether the player is the session host
+
+    SessionBasic:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: Unique session identifier
+        playerCount:
+          type: integer
+          minimum: 0
+          maximum: 15
+          description: Number of players in the session
+        hostName:
+          type: string
+          description: Name of the session host
+        createdAt:
+          type: integer
+          format: int64
+          description: Timestamp when session was created
+
+    GameState:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: Unique session identifier
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/Player'
+          description: List of players in the session
+        gameState:
+          type: string
+          enum: [lobby, playing, ended]
+          description: Current state of the game
+        timeOfDay:
+          type: string
+          nullable: true
+          description: Current time of day in the game
+        dayCount:
+          type: integer
+          minimum: 1
+          description: Current day number
+        chatMessages:
+          type: array
+          items:
+            type: object
+            properties:
+              player:
+                type: string
+              message:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+          description: Recent chat messages
+        winningParty:
+          type: string
+          nullable: true
+          enum: [villager, demon, null]
+          description: Winning party if game has ended
+        gamePhase:
+          type: string
+          enum: [day, demons, inspector, doctor]
+          description: Current game phase
+        playerCount:
+          type: integer
+          description: Number of players in the session
