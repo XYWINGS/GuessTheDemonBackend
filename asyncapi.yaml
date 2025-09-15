@@ -6,20 +6,3 @@ servers:
   localhost:
     url: localhost
     protocol: ws
-channels:
-  /:
-   publish:
-     operationId: ReceiveMessage
-     message:
-       $ref: '#/components/messages/message'
-   subscribe:
-     operationId: SendMessage
-     message:
-       $ref: '#/components/messages/message'
-components:
-  messages:
-    message:
-      name: message
-      title: message
-      payload:
-        type: object
